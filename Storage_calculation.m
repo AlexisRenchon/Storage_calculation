@@ -156,6 +156,7 @@ clearvars i n;
 % Convert ppm in umolco2m-3 
 n = length(datetime_met_c)*8;
 Height = [0.5 1 2 3.5 7 12 20 29];
+Height_mobile = [0.5 1 2 3.5 7 12 14];
 % Height previous to 05/10/2016 : [1 5 9 13 17 21 25 29]
 
 % Calculation of Ta vector as linear interpolation between Ta 30m and Ta7m
@@ -182,6 +183,17 @@ for i = 1:n
 end
 clearvars i n j; 
 
+% Calculation of [CO2] at 14m as linear interpolation between 12 and 20m
+% [CO2]
+n = length(datetime_met_c);
+CO2_14 = NaN(n,1);
+for i = 1:n
+    slope = (CO2_umolm3((i-1)*8+7) - CO2_umolm3((i-1)*8+6))/(20-12);
+    intercept = CO2_umolm3((i-1)*8+6) - slope*12;
+    CO2_14(i) = intercept + slope*14;
+end
+clearvars i n;
+
 % Manual check for P_ct and Ta 
 % figure; plot(datetime_met_c,P);
 % figure; plot(datetime_prof_c,Ta);
@@ -190,6 +202,7 @@ disp('Storage calculation...');
 n = length(datetime_met);
 progressbar
 Storage_layer = NaN(n*8-8,1); % -8 because need 2 half-hour for 1 storage
+Storage_layer_mobile14 = NaN(n*8-8,1); % using linear int [co2] at 14m
 Storage_flux = NaN(n-1,1);
 Storage_flux_mobile = NaN(n-1,1);
 Storage_flux_understory = NaN(n-1,1);
@@ -206,14 +219,18 @@ for i = 1:n-1;
     Storage_layer(8*i-2,1) = ((CO2_umolm3(8*i+5,1)-CO2_umolm3(8*i-3,1))/1800+(CO2_umolm3(8*i+6,1)-CO2_umolm3(8*i-2,1))/1800)*(Height(6)-Height(5))/2;
     Storage_layer(8*i-1,1) = ((CO2_umolm3(8*i+6,1)-CO2_umolm3(8*i-2,1))/1800+(CO2_umolm3(8*i+7,1)-CO2_umolm3(8*i-1,1))/1800)*(Height(7)-Height(6))/2;
     Storage_layer(8*i-0,1) = ((CO2_umolm3(8*i+7,1)-CO2_umolm3(8*i-1,1))/1800+(CO2_umolm3(8*i+8,1)-CO2_umolm3(8*i-0,1))/1800)*(Height(8)-Height(7))/2;
+    Storage_layer_mobile14(i,1) = ((CO2_umolm3(8*i+6,1)-CO2_umolm3(8*i-2,1))/1800+(CO2_14(i+1,1)-CO2_14(i,1))/1800)*(Height_mobile(7)-Height_mobile(6))/2;
     % this line sum the change in storage of all layers/height
     Storage_flux(i,1) = sum(Storage_layer(8*i-7:8*i,1));
-    Storage_flux_mobile(i,1) = sum(Storage_layer(7*i-6:7*i,1));
-    Storage_flux_understory(i,1) = sum(Storage_layer(3*i-2:3*i,1));
-    % example: 
+    Storage_flux_mobile(i,1) = sum(Storage_layer(8*i-7:8*i-2,1)) + Storage_layer_mobile14(i,1);
+    Storage_flux_understory(i,1) = sum(Storage_layer(8*i-7:8*i-5,1));
+    % example: Main tower
     % 8*1-7:8*1 = [1 2 3 4 5 6 7 8]
     % 8*2-7:8*2 = [9 10 11 12 13 14 15 16]
     % and so on...
+    % Mobile
+    % 8*1-7:8*1-2 = [1 2 3 4 5 6]
+    % 8*2-7:8*2-2 = [9 10 11 12 13 14]
 end
 clearvars i n;
 
